@@ -2,14 +2,14 @@
 const mongoose = require('mongoose');
 
 const scheduleSchema = new mongoose.Schema({
-    teacher: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Teacher',
-        required: true
-    },
     division: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Division',
+        required: true
+    },
+    teacher: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Teacher',
         required: true
     },
     classroom: {
@@ -23,8 +23,7 @@ const scheduleSchema = new mongoose.Schema({
     },
     dayOfWeek: {
         type: String,
-        required: true,
-        enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        required: true
     },
     timeSlot: {
         type: String,
@@ -36,22 +35,8 @@ const scheduleSchema = new mongoose.Schema({
     },
     scheduleType: {
         type: String,
-        enum: ['division', 'teacher'],
-        required: true
-    },
-    status: {
-        type: String,
-        enum: ['scheduled', 'cancelled', 'completed'],
-        default: 'scheduled'
+        default: 'division'
     }
-}, {
-    timestamps: true
 });
-
-// Add indexes for efficient querying
-scheduleSchema.index({ teacher: 1, dayOfWeek: 1, timeSlot: 1 });
-scheduleSchema.index({ division: 1, dayOfWeek: 1, timeSlot: 1 });
-scheduleSchema.index({ classroom: 1, dayOfWeek: 1, timeSlot: 1 });
-scheduleSchema.index({ semester: 1 });
 
 module.exports = mongoose.model('Schedule', scheduleSchema);

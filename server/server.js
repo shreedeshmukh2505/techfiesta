@@ -8,6 +8,7 @@ const studentRoutes = require('./routes/students');
 const teacherRoutes = require('./routes/teachers');
 const classroomRoutes = require('./routes/classrooms');
 const scheduleRoutes = require('./routes/schedules');
+const divisionRoutes = require('./routes/divisions');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/students', studentRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/classrooms', classroomRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/divisions', divisionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

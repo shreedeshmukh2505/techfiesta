@@ -1,13 +1,17 @@
-// src/components/dashboard/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { scheduleService } from '../../services/api';
+import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
+import { Alert, AlertDescription } from '../ui/alert';
+import { Loader2 } from 'lucide-react';
+
 
 const Dashboard = () => {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSemester, setSelectedSemester] = useState('Fall 2024');
-  const [view, setView] = useState('weekly'); // weekly or daily
+  const [selectedDivision, setSelectedDivision] = useState('all');
+  const [divisions, setDivisions] = useState([]);
+  const [error, setError] = useState(null);
 
   const timeSlots = [
     '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
@@ -17,52 +21,105 @@ const Dashboard = () => {
   const weekDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 
   useEffect(() => {
+    fetchDivisions();
     fetchSchedules();
-  }, [selectedSemester]);
+  }, [selectedSemester, selectedDivision]);
 
-  const generateNewSchedule = async () => {
+  const fetchDivisions = async () => {
     try {
-      setLoading(true);
-      await scheduleService.generateSchedule(selectedSemester);
-      await fetchSchedules(); // Refresh the schedule display
-      setLoading(false);
+      const response = await fetch('http://localhost:5001/api/divisions');
+      if (!response.ok) throw new Error('Failed to fetch divisions');
+      const data = await response.json();
+      setDivisions(data);
     } catch (error) {
-      console.error('Error generating schedule:', error);
-      setLoading(false);
+      setError('Error loading divisions: ' + error.message);
+      console.error('Error fetching divisions:', error);
     }
   };
 
   const fetchSchedules = async () => {
     try {
+      setLoading(true);
       const response = await fetch(`http://localhost:5001/api/schedules/semester/${selectedSemester}`);
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error('Failed to fetch schedules');
       }
+      
       const data = await response.json();
+      console.log('Fetched schedules:', data); // Debug log
+      
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid schedule data received');
+      }
+      
       setSchedules(data);
-      setLoading(false);
+      setError(null);
     } catch (error) {
+      setError('Error loading schedules: ' + error.message);
       console.error('Error fetching schedules:', error);
-      setSchedules([]);
+      setSchedules([]); // Reset schedules on error
+    } finally {
       setLoading(false);
     }
   };
 
-  const getScheduleForSlot = (day, timeSlot) => {
-    return schedules.find(schedule => 
+  const generateNewSchedule = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5001/api/schedules/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ semester: selectedSemester })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to generate schedule');
+      }
+
+      await fetchSchedules();
+      setError(null);
+    } catch (error) {
+      setError('Error generating schedule: ' + error.message);
+      console.error('Error generating schedule:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getScheduleForSlot = (day, time) => {
+    return schedules.filter(schedule => 
       schedule.dayOfWeek === day && 
-      schedule.timeSlot === timeSlot
+      schedule.timeSlot === time &&
+      (selectedDivision === 'all' || schedule.division.name === selectedDivision)
     );
   };
 
-  const renderScheduleCell = (schedule) => {
-    if (!schedule) return null;
+  const renderScheduleCell = (schedules) => {
+    if (!schedules || schedules.length === 0) {
+      return <div className="h-full border border-gray-200 bg-gray-50"></div>;
+    }
 
     return (
-      <div className="p-2 bg-blue-100 rounded shadow-sm">
-        <p className="font-medium text-sm">{schedule.subject}</p>
-        <p className="text-xs">{schedule.teacher.name}</p>
-        <p className="text-xs">Room {schedule.classroom.roomNumber}</p>
+      <div className="h-full space-y-2">
+        {schedules.map((schedule, index) => (
+          <div 
+            key={`${schedule._id}-${index}`}
+            className="p-2 bg-blue-100 rounded shadow-sm hover:bg-blue-200 transition-colors"
+          >
+            <p className="font-medium text-sm truncate">{schedule.subject}</p>
+            <p className="text-xs truncate">
+              Teacher: {schedule.teacher?.name || 'N/A'}
+            </p>
+            <p className="text-xs truncate">
+              Room: {schedule.classroom?.roomNumber || 'N/A'}
+            </p>
+            <p className="text-xs text-gray-600 truncate">
+              Division: {schedule.division?.name || 'N/A'}
+            </p>
+          </div>
+        ))}
       </div>
     );
   };
@@ -70,7 +127,8 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <p>Loading schedules...</p>
+        <Loader2 className="w-8 h-8 animate-spin" />
+        <p className="ml-2">Loading schedules...</p>
       </div>
     );
   }
@@ -81,13 +139,14 @@ const Dashboard = () => {
         <h1 className="text-2xl font-bold">Class Schedule</h1>
         
         <div className="flex space-x-4">
-        <button
-  onClick={generateNewSchedule}
-  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-  disabled={loading}
->
-  {loading ? 'Generating...' : 'Generate Schedule'}
-</button>
+          <button
+            onClick={generateNewSchedule}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+            disabled={loading}
+          >
+            {loading ? 'Generating...' : 'Generate Schedule'}
+          </button>
+
           <select
             value={selectedSemester}
             onChange={(e) => setSelectedSemester(e.target.value)}
@@ -98,61 +157,90 @@ const Dashboard = () => {
           </select>
 
           <select
-            value={view}
-            onChange={(e) => setView(e.target.value)}
+            value={selectedDivision}
+            onChange={(e) => setSelectedDivision(e.target.value)}
             className="rounded-md border border-gray-300 p-2"
           >
-            <option value="weekly">Weekly View</option>
-            <option value="daily">Daily View</option>
+            <option value="all">All Divisions</option>
+            {divisions.map(division => (
+              <option key={division._id} value={division.name}>
+                {division.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      {/* Schedule Grid */}
-      <div className="overflow-x-auto">
-        <div className="min-w-max">
-          <div className="grid grid-cols-6 gap-4 bg-gray-50 p-4 rounded-t-lg">
-            <div className="font-medium">Time</div>
-            {weekDays.map(day => (
-              <div key={day} className="font-medium capitalize">
-                {day}
-              </div>
-            ))}
-          </div>
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-          {timeSlots.map(timeSlot => (
-            <div key={timeSlot} className="grid grid-cols-6 gap-4 border-b p-4">
-              <div className="font-medium">{timeSlot}</div>
-              {weekDays.map(day => (
-                <div key={`${day}-${timeSlot}`}>
-                  {renderScheduleCell(getScheduleForSlot(day, timeSlot))}
-                </div>
-              ))}
+      {/* Schedule Grid */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Timetable View</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="min-w-max">
+              <div className="grid grid-cols-6 gap-4 pb-4 border-b">
+                <div className="font-medium px-4">Time</div>
+                {weekDays.map(day => (
+                  <div key={day} className="font-medium capitalize px-4">{day}</div>
+                ))}
+              </div>
+
+              <div className="space-y-1">
+                {timeSlots.map(timeSlot => (
+                  <div key={timeSlot} className="grid grid-cols-6 gap-4 py-4 border-b last:border-b-0">
+                    <div className="font-medium px-4">{timeSlot}</div>
+                    {weekDays.map(day => (
+                      <div key={`${day}-${timeSlot}`} className="px-4 min-h-[100px]">
+                        {renderScheduleCell(getScheduleForSlot(day, timeSlot))}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Section */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="font-medium mb-2">Total Classes</h3>
-          <p className="text-2xl">{schedules.length}</p>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Classes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl">{schedules.length}</p>
+          </CardContent>
+        </Card>
         
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="font-medium mb-2">Active Teachers</h3>
-          <p className="text-2xl">
-            {new Set(schedules.map(s => s.teacher._id)).size}
-          </p>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Teachers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl">
+              {new Set(schedules.map(s => s.teacher?._id)).size}
+            </p>
+          </CardContent>
+        </Card>
         
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="font-medium mb-2">Utilized Classrooms</h3>
-          <p className="text-2xl">
-            {new Set(schedules.map(s => s.classroom._id)).size}
-          </p>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Utilized Classrooms</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl">
+              {new Set(schedules.map(s => s.classroom?._id)).size}
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
