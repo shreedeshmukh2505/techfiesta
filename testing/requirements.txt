@@ -1,0 +1,5 @@
+# testing/requirements.txt
+numpy==1.21.0
+tabulate==0.8.9
+pytest==6.2.5
+pytest-cov==2.12.1

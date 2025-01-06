@@ -1,0 +1,25 @@
+{
+    "courses": [
+        {
+            "id": 1,
+            "name": "Advanced Mathematics",
+            "subject": "Mathematics",
+            "students": 30,
+            "sessions_per_week": 3
+        },
+        {
+            "id": 2,
+            "name": "Physics Mechanics",
+            "subject": "Physics",
+            "students": 25,
+            "sessions_per_week": 3
+        },
+        {
+            "id": 3,
+            "name": "Chemistry Lab",
+            "subject": "Chemistry",
+            "students": 20,
+            "sessions_per_week": 2
+        }
+    ]
+}
