@@ -1,4 +1,4 @@
-const AGADRScheduler = require('../services/AGADRScheduler');
+const { generateTimetable } = require('../algorithms/timetableGenerator');
 const Division = require('../models/Division');
 const Teacher = require('../models/Teacher');
 const Classroom = require('../models/Classroom');
@@ -9,67 +9,69 @@ exports.generateSchedule = async (req, res) => {
     const { semester } = req.body;
     console.log('Starting schedule generation for semester:', semester);
     
-    // Fetch all required data with proper population
+    // Fetch all required data
     const divisions = await Division.find({ semester }).lean();
     const teachers = await Teacher.find().lean();
     const classrooms = await Classroom.find().lean();
+
+    console.log('Fetched data:', {
+      divisionsCount: divisions.length,
+      teachersCount: teachers.length,
+      classroomsCount: classrooms.length
+    });
 
     if (!divisions.length) {
       throw new Error('No divisions found for the selected semester');
     }
 
-    const scheduler = new AGADRScheduler();
-    const generatedSchedule = await scheduler.generateTimetable(divisions, teachers, classrooms);
+    // Generate schedule using Flask API
+    const generatedSchedule = await generateTimetable({
+      divisions,
+      teachers,
+      classrooms,
+      semester
+    });
 
-    // Clear existing schedules for the semester
+    console.log('Schedule generated successfully');
+
+    // Clear existing schedules
     await Schedule.deleteMany({ semester });
     console.log('Cleared existing schedules');
     
-    // Save new schedule to database
+    // Save new schedules
     const schedulePromises = generatedSchedule.map(entry => {
-      const division = divisions.find(d => d.name === entry.division);
-      const teacher = teachers.find(t => t.name === entry.teacher);
-      const classroom = classrooms.find(c => c.roomNumber === entry.classroom);
-
-      if (!division || !teacher || !classroom) {
-        console.warn('Missing reference:', { entry, division, teacher, classroom });
-        return null;
-      }
-
       const schedule = new Schedule({
-        division: division._id,
-        teacher: teacher._id,
-        classroom: classroom._id,
+        division: entry.division._id,
+        teacher: entry.teacher._id,
+        classroom: entry.classroom._id,
         subject: entry.subject,
-        dayOfWeek: entry.dayOfWeek,
-        timeSlot: entry.timeSlot,
-        semester,
-        scheduleType: 'division'
+        dayOfWeek: entry.day,
+        timeSlot: entry.time,
+        semester
       });
       return schedule.save();
     });
-    
-    const savedSchedules = await Promise.all(schedulePromises.filter(Boolean));
+
+    const savedSchedules = await Promise.all(schedulePromises);
     console.log(`Saved ${savedSchedules.length} schedules`);
 
-    // Fetch the saved schedules with populated data
+    // Fetch complete schedule with populated references
     const populatedSchedules = await Schedule.find({ semester })
       .populate('division')
       .populate('teacher')
       .populate('classroom')
       .lean();
-    
-    res.json({ 
+
+    res.json({
       message: 'Schedule generated successfully',
-      schedule: populatedSchedules,
-      savedCount: savedSchedules.length
+      schedule: populatedSchedules
     });
+
   } catch (error) {
     console.error('Schedule generation error:', error);
     res.status(500).json({ 
       message: 'Error generating schedule', 
-      error: error.message,
-      details: error.stack
+      error: error.message 
     });
   }
 }; 

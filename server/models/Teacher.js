@@ -45,7 +45,15 @@ const teacherSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  maxConsecutiveSlots: { type: Number, default: 3 },
+  breakPreferences: [String],
+  subjectLoadPerWeek: {
+    type: Map,
+    of: Number
+  },
+  preferredRooms: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Classroom' }],
+  conflictTeachers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Teacher' }]
 });
 
 module.exports = mongoose.model('Teacher', teacherSchema);

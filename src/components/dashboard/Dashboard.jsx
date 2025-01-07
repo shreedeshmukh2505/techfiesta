@@ -89,8 +89,10 @@ const Dashboard = () => {
   };
 
   const getScheduleForSlot = (day, time) => {
+    if (!schedules) return [];
+    
     return schedules.filter(schedule => 
-      schedule.dayOfWeek === day && 
+      schedule.dayOfWeek.toLowerCase() === day.toLowerCase() && 
       schedule.timeSlot === time &&
       (selectedDivision === 'all' || schedule.division.name === selectedDivision)
     );

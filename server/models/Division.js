@@ -29,7 +29,16 @@ const divisionSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  preferredDays: [String],
+  subjectPreferences: [{
+    subject: String,
+    preferredSlots: [String],
+    preferredTeachers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Teacher' }]
+  }],
+  consecutiveSlotLimit: { type: Number, default: 3 },
+  dailySubjectLimit: { type: Number, default: 6 },
+  breakPreferences: [String]
 });
 
 module.exports = mongoose.model('Division', divisionSchema); 

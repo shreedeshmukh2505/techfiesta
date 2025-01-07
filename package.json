@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@shadcn/ui": "^0.0.4",
+    "axios": "^1.7.9",
     "cors": "^2.8.5",
     "cra-template": "1.2.0",
     "date-fns": "^4.1.0",
